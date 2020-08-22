@@ -1,4 +1,37 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Hello World!</h1>
+{% load static %}
+<audio autoplay controls id="player">
+</audio>
+<button onclick="next()">next</button>
+<script>
+    window.onload = function(){
+        document.getElementById('player').play();
+    }
+
+    var songs = [
+        {% for song in songlist %}
+        "{{ song }}",
+        {% endfor %}
+    ]
+
+    var i = 0;
+    var music_player = document.getElementById('player');
+    function next(){
+        if (i === songs.length - 1) {
+            i=0;
+        }
+        else{
+            i++;
+        }
+        music_player.src = songs[i];
+    }
+    if (music_player === null){
+        throw "Does not exist"
+    }
+    else{
+        music_player.src = songs[i];
+        music_player.addEventListener('ended', next, false);
+    }
+</script>
 {% endblock %}
