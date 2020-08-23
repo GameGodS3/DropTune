@@ -25,7 +25,7 @@ SECRET_KEY = '!$ogx1dxnm$@olyvpda0pfpt-pe260@lf%$57g#0e(lmzd5j!k'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.43.54'] #Replace '192.168.43.54' with the local IP Address of your Laptop/PC
 
 
 # Application definition
