@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+
+
+<form action="/dj" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ musicform }}
+<input type="submit" value="Submit">
+</form>
+{% endblock %}

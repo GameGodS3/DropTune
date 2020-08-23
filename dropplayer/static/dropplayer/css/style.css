@@ -81,7 +81,7 @@ body{
     transition-delay: .1s;
 }
 .dj:hover .disc{
-    transform: scale(1.2);
+    transform: scale(1.2) rotate(360deg);
     transition: .5s;
 }
 
