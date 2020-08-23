@@ -1,4 +1,4 @@
-# DropTune Over-the-Air Music Player
+# DropTune : Over-the-Air Music Player
 
 *Ever wanted to play music in your TV or Music System that does not support over-the-air, but you are too lazy to write songs into a USB?*
 
