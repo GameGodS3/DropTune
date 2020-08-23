@@ -29,10 +29,15 @@ Clone using
 ```
 git clone https://github.com/GameGodS3/DropTune.git
 ```
+and
+```
+cd DropTune
+```
 
 Then
 ### For Linux
 ```bash
+chmod +x ./install.sh
 ./install.sh
 ./launch.sh
 ```
