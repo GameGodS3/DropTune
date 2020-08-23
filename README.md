@@ -12,6 +12,8 @@ Upload songs from one device and have it played in another device.
 ## Synopsis
 DropTune has two modes: DJ and Player, to drop a song for playback, and to play the dropped song, respectively.
 
+![Program Screenshot](https://github.com/GameGodS3/DropTune/blob/master/screenshot.png?raw=true)
+
 ### Prerequisites
 
 Requires python3 and pip3 installed in the Laptop/PC.
