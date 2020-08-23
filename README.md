@@ -24,7 +24,9 @@ OR
 
 Clone using
 
-```git clone https://github.com/GameGodS3/DropTune.git```
+```
+git clone https://github.com/GameGodS3/DropTune.git
+```
 
 Then
 ### For Linux
@@ -38,6 +40,10 @@ install.bat
 launch.bat
 ```
 Or double click on `install.bat` and then `launch.bat`
+
+If you know how to access your laptop/PC's IP address and connect to the localhost using a mobile or other devices connected to the same network, you could better use the player.
+
+More clear instructions on that part coming up.
 
 ---
 ---
