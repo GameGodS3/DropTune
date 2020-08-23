@@ -1,37 +1,26 @@
 {% extends 'base.html' %}
 {% block content %}
 {% load static %}
-<audio autoplay controls id="player">
-</audio>
-<button onclick="next()">next</button>
+<div class="home">
+    <div class="droptune">DropTune</div>
+    <div class="mode dj">
+        <div class="disc"></div>
+        <div class="stick"></div>
+    </div>
+    <div class="mode musplay" onclick="window.location = '/player'">
+        <div class="note1 note"></div>
+        <div class="note2 note"></div>
+    </div>
+</div>
 <script>
+    var title = document.getElementsByClassName('droptune')[0];
+    var modes = document.getElementsByClassName('mode');
     window.onload = function(){
-        document.getElementById('player').play();
-    }
-
-    var songs = [
-        {% for song in songlist %}
-        "{{ song }}",
-        {% endfor %}
-    ]
-
-    var i = 0;
-    var music_player = document.getElementById('player');
-    function next(){
-        if (i === songs.length - 1) {
-            i=0;
+        title.id = 'ascend';
+        for (let i = 0; i < modes.length; i++) {
+            const element = modes[i];
+            element.id = 'softpop';            
         }
-        else{
-            i++;
-        }
-        music_player.src = songs[i];
-    }
-    if (music_player === null){
-        throw "Does not exist"
-    }
-    else{
-        music_player.src = songs[i];
-        music_player.addEventListener('ended', next, false);
     }
 </script>
 {% endblock %}

@@ -10,6 +10,9 @@ def get_song_list():
         namelist.append(filename)
     return namelist
 
-def index(request):
+def index(request):    
+    return render(request, 'dropplayer/index.html')
+
+def player(request):
     song_list = get_song_list()
-    return render(request, 'dropplayer/index.html', {'songlist': song_list})
+    return render(request, 'dropplayer/player.html', {'songlist': song_list})

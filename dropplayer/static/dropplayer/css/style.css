@@ -1,3 +1,142 @@
+/*Defining base colours*/
+:root{
+    --pri: #00163c;
+    --prihov: #001233;
+    --sec: #252525;
+    --acc: #d7d7d7;
+}
+/*Custom Font*/
+@font-face{
+    font-family: 'Swis721';
+    src: url(../fonts/swisse.ttf);
+    font-weight: normal;
+}
+@font-face{
+    font-family: 'Swis721';
+    src: url(../fonts/swisseb.ttf);
+    font-weight: bold;
+}
+
 body{
-    background-color: red;
+    padding: 0;
+    margin: 0;
+    background-color: var(--pri);
+}
+.home{
+    height: 100vh;
+    display: flex;
+}
+/*Animation sets*/
+@keyframes ascend{
+    from{margin-top: 20px; opacity: 0;}
+    to{margin-top: 0; opacity: 1;}
+}
+@keyframes softpop{
+    from{transform: scale(0.8); opacity: 0;}
+    to{transform: scale(1); opacity: 1;}
+}
+#ascend{
+    animation: ascend .5s forwards;
+    animation-delay: .5s;
+}
+#softpop{
+    animation: softpop .5s forwards;
+    animation-delay: .5s;
+}
+
+/*DropTune Title*/
+.droptune{
+    position: absolute;
+    text-align: center;
+    color: var(--acc);
+    width: 100%;
+    padding: 15px 0px;
+    z-index: 20;
+    font-family: 'Swis721';
+    font-weight: bold;
+    font-size: 50px;
+    opacity: 0;
+}
+/*MODE*/
+.mode{
+    margin: 0;
+    width: 50vw;
+    height: 100vh;
+    transition: .5s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+}
+.mode:hover{
+    background-color: var(--prihov);
+    transition: .5s;
+    cursor: pointer;
+}
+
+/* DJ Mode styles*/
+.dj:hover .stick{
+    transform: rotate(0deg) scale(1.2);
+    transition: .5s;
+    transition-delay: .1s;
+}
+.dj:hover .disc{
+    transform: scale(1.2);
+    transition: .5s;
+}
+
+.disc{
+    background-image: url('../images/disc.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    height: 180px;
+    width: 180px;
+    position: absolute;
+    transition: .5s;
+}
+.stick{
+    transform: rotate(-20deg) translate(35px, -20px);
+    position: relative;
+    left: 160px;
+    bottom: 50px;
+    background-image: url('../images/stick.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    height: 180px;
+    width: 180px;
+    transition: transform .5s;
+}
+
+/* Player Mode Styles */
+.musplay{
+    z-index: 5;
+}
+.musplay:hover .note1{
+    transform: scale(1.2);
+    transition: .5s;
+}
+.musplay:hover .note2{
+    transform: scale(1.2);
+    transition: .5s;
+    transition-delay: .1s;
+}
+.note{
+    background-image: url(../images/note.png);
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+.note1{
+    height: 180px;
+    width: 180px;
+    position: absolute;
+    transition: .5s;
+}
+.note2{
+    height: 60px;
+    width: 60px;
+    position: relative;
+    transition: .5s;
+    top: 40px;
+    left: 60px;
+    transform: rotate(20deg);
 }
