@@ -1,0 +1,1 @@
+This file is just kept here so that git doesn't do the dumb thing by not including the folder.
