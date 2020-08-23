@@ -1,12 +1,24 @@
 {% extends 'base.html' %}
 {% block content %}
 {% load static %}
-<audio autoplay controls id="player">
-</audio>
+
+<audio autoplay controls id="player"></audio>
 <button onclick="next()">next</button>
+<form action="/player" method="post" enctype="multipart/form-data" id='endconfirm'>
+{% csrf_token %}
+    {{ endconfirm }}
+<input type="submit" value="Submit" id="ender" hidden>
+</form>
+
+
 <script>
     window.onload = function(){
         document.getElementById('player').play();
+        document.getElementById('id_complete').value = 'ended'
+        if (document.getElementById('player').getAttribute('src') === "undefined") {
+        alert("Drop a song from DJ mode!");
+        window.location = '/player';
+    }
     }
 
     var songs = [
@@ -14,10 +26,13 @@
         "{{ song }}",
         {% endfor %}
     ]
-
+    for (let i = 0; i < songs.length; i++) {
+        songs[i] = songs[i].replace(/&#x27;/g, "'");      
+    }
     var i = 0;
     var music_player = document.getElementById('player');
-    function next(){
+    `function next(){
+        location.reload()
         if (i === songs.length - 1) {
             i=0;
         }
@@ -25,7 +40,7 @@
             i++;
         }
         music_player.src = songs[i];
-    }
+    }`
     if (music_player === null){
         throw "Does not exist"
     }
@@ -33,5 +48,34 @@
         music_player.src = songs[i];
         music_player.addEventListener('ended', next, false);
     }
+    var flag = 0;
+    function next(){
+        music_player.pause();
+        music_player.src = '';
+        if (i === songs.length - 1) {
+            i=0;
+        }
+        else{
+            i++;
+        }
+        music_player.src = songs[i];
+        console.log(i);
+        if (i!=0){
+        document.getElementById('endconfirm').submit();
+        }
+        else{
+            location.reload();
+            music_player.src = songs[i+1];
+            document.getElementById('endconfirm').submit();
+        }
+        
+        flag = 1;
+    }
+    if (flag == 1) {
+
+        flag = 0;
+        location.reload();
+    }
+    
 </script>
 {% endblock %}

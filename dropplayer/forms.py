@@ -13,4 +13,7 @@ def saveNewSong(f):
         song.write(f.read())
 
 class MusicUpload(forms.Form):
-    newsong = forms.FileField(widget=forms.ClearableFileInput(attrs={'style':'color:white'}), label="")
+    newsong = forms.FileField(widget=forms.ClearableFileInput(attrs={'style':'color:white', 'accept':'audio/mpeg'}), label="")
+
+class songComplete(forms.Form):
+    complete = forms.CharField(label='', widget=forms.TextInput(attrs={'hidden':''}))

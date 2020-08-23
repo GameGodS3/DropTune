@@ -9,7 +9,7 @@ Upload songs from one device and have it played in another device.
 ##### "Inspiration"
 ###### I had a Raspberry Pi 2 Model A which had no Wi-Fi module but can connect to internet by using tethering from an old Nokia. But the internet was slow, and the Pi cannot handle quite heavy pieces of software. Hence, this.
 
-## Usage
+## Synopsis
 DropTune has two modes: DJ and Player, to drop a song for playback, and to play the dropped song, respectively.
 
 ### Prerequisites
@@ -29,14 +29,30 @@ Clone using
 Then
 ### For Linux
 ```bash
-cd DropTune
-pip3 install -r requirements.txt
+./install.sh
+./launch.sh
 ```
 ### For Windows
 ```cmd
-cd DropTune
-pip install -r requirements.txt
+install.bat
+launch.bat
 ```
------------------
-##### Incomplete README
------------------
+Or double click on `install.bat` and then `launch.bat`
+
+---
+---
+## Troubleshooting
+If the page doesn't load in your browser after 15-20 seconds, press reload
+
+If it still doesn't, close the terminal that opened when you launched the `launch.bat` / `launch.sh`. 
+
+Open a fresh terminal in the folder and type
+##### For Linux
+```
+python3 manage.py runserver
+```
+##### For Windows
+```
+python manage.py runserver
+```
+And then try the URL that comes after it loads.
