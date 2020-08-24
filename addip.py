@@ -1,0 +1,18 @@
+import os
+import socket
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+ip = str(s.getsockname()[0])
+s.close()
+
+with open('droptune/settings.py', 'r') as f:
+    settings = f.read()
+
+replacetxt = "ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '" + ip + "']"
+newset = settings.replace("ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']", replacetxt)
+
+with open('droptune/settings.py', 'w') as f:
+    f.write(newset)

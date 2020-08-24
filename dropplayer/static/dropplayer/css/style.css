@@ -18,6 +18,7 @@
 }
 
 body{
+    font-family: "Swis721";
     padding: 0;
     margin: 0;
     background-color: var(--pri);
@@ -106,7 +107,70 @@ body{
     width: 180px;
     transition: transform .5s;
 }
+/*QRCode Holder*/
+.connect{
+    background-color: var(--acc);
+    background-image: url(../images/svg28.svg);
+    height: fit-content;
+    position: fixed;
+    bottom: 10%;
+    right: 5%;
+    border-radius: 20px;
+    z-index: 100;
+    display: block;
+}
+.connect{
+    background-color: var(--acc);
+    background-image: url(../images/svg28.svg);
+    height: 45px;
+    position: fixed;
+    bottom: 10%;
+    right: 5%;
+    border-radius: 20px;
+    z-index: 100;
+    display: block;
+    width: 45px;
+    box-shadow: #00000083 6px 6px 15px;
+    opacity: 0;
+    cursor: pointer;
+}
 
+.connect:hover .context{
+    width: 175px;
+    padding: 5px;
+    font-size: medium;
+    right: 181px;
+    opacity: 1;
+    transition: right .4s , opacity .5s cubic-bezier(.98,.01,1,.81);
+}
+.context{
+    background-color: var(--acc);
+    width: 0;
+    font-family: "Swis721";
+    font-weight: normal;
+    position: relative;
+    right: 0px;
+    top: 8px;
+    font-size: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+.qr{
+    width: fit-content;
+    position: relative;
+    right: 165px;
+    bottom: 150px;
+    padding: 10px;
+    text-align: center;
+    opacity: 0;
+    color: var(--acc);
+    font-weight: bold;
+}
+.qr img{
+    max-width: 150px;
+    height: auto;
+}
 /* Player Mode Styles */
 .musplay{
     z-index: 5;

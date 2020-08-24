@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 import os, glob
+from .qrcodegen import qrgen
 from .forms import MusicUpload, saveNewSong, songComplete
 # Create your views here.
 def get_song_list():
@@ -20,7 +21,8 @@ def index(request):
     """
     Renders DropTune homepage
     """
-    return render(request, 'dropplayer/index.html')
+    imgdata, ip = qrgen()
+    return render(request, 'dropplayer/index.html', {'qrcode': imgdata, 'ip': ip})
 
 def player(request):
     """

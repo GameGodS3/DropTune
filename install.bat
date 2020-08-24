@@ -1,4 +1,5 @@
 pip install -r requirements.txt
-echo start /max http://localhost:8000 > launch.bat
-echo python manage.py runserver >> launch.bat
+python addip.py
+echo start /max http://localhost:6969 > launch.bat
+echo python manage.py runserver 0.0.0.0:6969 >> launch.bat
 del install.bat
