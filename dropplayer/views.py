@@ -48,11 +48,18 @@ def dj(request):
     """
     Renders and manages the uploaded song of the DJ page
     """
+    songlist=[]
+    for song in get_song_list():
+        song = song[25:]
+        songlist.append(song)
     if request.method == "POST":
         form = MusicUpload(request.POST, request.FILES)
         if form.is_valid():
             saveNewSong(request.FILES['newsong'])
-            return render(request, 'dropplayer/dj.html', {'musicform':form})
+            return render(request, 'dropplayer/blank.html')
     else:
         form = MusicUpload()
-    return render(request, 'dropplayer/dj.html', {'musicform':form})
+    return render(request, 'dropplayer/dj.html', {'musicform':form, 'songlist':songlist})
+
+def loading(request):
+    return render(request, 'dropplayer/blank.html')

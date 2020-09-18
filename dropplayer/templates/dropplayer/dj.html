@@ -6,6 +6,13 @@
 <form action="/dj" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ musicform }}
-<input type="submit" value="Submit">
+<input type="submit" value="Submit" id="sub" onclick="refrlist()">
 </form>
+
+<div class="songlist" style="color: #fff;">
+    {% for song in songlist %}
+    {{song}} <br>
+    {% endfor %}
+</div>
+
 {% endblock %}
