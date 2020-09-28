@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.views.generic.edit import FormView
 import os, glob
 from .qrcodegen import qrgen
 from .forms import MusicUpload, saveNewSong, songComplete
@@ -44,6 +45,20 @@ def player(request):
         form = songComplete()
     return render(request, 'dropplayer/player.html', {'songlist': song_list, 'endconfirm': form})
 
+
+#Multiple File Form handling class
+class MultiSongView(FormView):
+    form_class = MusicUpload
+    template_name = 'dropplayer/dj.html'
+    success_url = 'dropplayer/blank.html'
+
+    def post(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        files = request.FILES.getlist('newsong')
+        if form.is_valid():
+            for f in files:
+                saveNewSong(f)
 def dj(request):
     """
     Renders and manages the uploaded song of the DJ page
@@ -55,6 +70,8 @@ def dj(request):
     if request.method == "POST":
         form = MusicUpload(request.POST, request.FILES)
         if form.is_valid():
+            print(request.FILES)
+            print(request.FILES['newsong'])
             saveNewSong(request.FILES['newsong'])
             return render(request, 'dropplayer/blank.html')
     else:
