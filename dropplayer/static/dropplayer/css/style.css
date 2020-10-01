@@ -47,12 +47,10 @@ body{
 
 /*DropTune Title*/
 .droptune{
-    position: absolute;
     text-align: center;
     color: var(--acc);
     width: 100%;
     padding: 15px 0px;
-    z-index: 20;
     font-family: 'Swis721';
     font-weight: bold;
     font-size: 50px;

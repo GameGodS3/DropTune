@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 {% load static %}
-
+<div>
 <audio autoplay controls id="player"></audio>
 <button onclick="next()">next</button>
 <br>
@@ -11,74 +11,45 @@
     {{ endconfirm }}
 <input type="submit" value="Submit" id="ender" hidden>
 </form>
-
+</div>
 
 <script>
-    window.onload = function(){
-        document.getElementById('player').play();
-        document.getElementById('id_complete').value = 'ended'
-        if (document.getElementById('player').getAttribute('src') === "undefined") {
-            alert("Drop a song from DJ mode from any device!");
-        window.location = '/';
-        }
-    }
-
     var songs = [
         {% for song in songlist %}
         "{{ song }}",
         {% endfor %}
     ]
-    for (let i = 0; i < songs.length; i++) {
-        songs[i] = songs[i].replace(/&#x27;/g, "'");      
-    }
-    var i = 0;
     var music_player = document.getElementById('player');
-    `function next(){
-        location.reload()
-        if (i === songs.length - 1) {
-            i=0;
-        }
-        else{
-            i++;
-        }
-        music_player.src = songs[i];
-    }`
+    var i = 0;
+
+    // Handle this better. There are a lot of cases.
+    songs.forEach((song) => {
+        song.replace(/&#x27;/g, "'")
+    });
+
     if (music_player === null){
         throw "Does not exist"
     }
     else{
-        music_player.src = songs[i];
-        document.getElementsByClassName('nowplaying')[0].innerHTML = songs[i].slice(25, );
-        music_player.addEventListener('ended', next, false);
+        if(!songs.length) {
+        alert("Drop a song from DJ mode from any device!");
+        } else {
+            music_player.src = songs[i];
+            document.getElementsByClassName('nowplaying')[0].innerHTML = songs[i].slice(25, );
+            music_player.addEventListener('ended', next, false);
+        }
     }
-    var flag = 0;
     function next(){
         music_player.pause();
-        music_player.src = '';
-        if (i === songs.length - 1) {
-            i=0;
+        i = ++i % songs.length
+        console.log(songs[i]);
+        if(!songs[i]) {
+            alert("Song doesn't exist!");
+        } else {
+            music_player.setAttribute('src', songs[i]);
+            document.getElementsByClassName('nowplaying')[0].innerHTML = songs[i].slice(25, );
+            music_player.play();
         }
-        else{
-            i++;
-        }
-        music_player.src = songs[i];
-        console.log(i);
-        if (i!=0){
-            location.href = '/loading';
-            document.getElementById('endconfirm').submit();
-        }
-        else{
-            location.href = '/loading';
-            music_player.src = songs[i+1];
-            document.getElementById('endconfirm').submit();
-        }
-        
-        flag = 1;
-    }
-    if (flag == 1) {
-
-        flag = 0;
-        location.reload();
     }
     
 </script>
