@@ -8,7 +8,14 @@
     <title>DropTune</title>
 </head>
 <body>
+    <div class="droptune">DropTune</div>
     {% block content %}
     {% endblock %}
 </body>
+<script>
+    var title = document.getElementsByClassName('droptune')[0];
+    window.onload = function(){
+        title.id = 'ascend';
+    }
+</script>
 </html>

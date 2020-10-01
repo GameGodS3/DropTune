@@ -12,9 +12,7 @@ def addip():
         settings = f.readlines()
 
     replacetxt = "ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '" + ip + "']\n"
-
     settings[27] = replacetxt
-    #newset = settings.replace("ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']", replacetxt)
 
     with open('droptune/settings.py', 'w') as f:
         f.writelines(settings)

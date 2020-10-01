@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 import os, glob
 from .qrcodegen import qrgen
+from .tagextract import TagExtract
 from .forms import MusicUpload, saveNewSong, songComplete
 # Create your views here.
 def get_song_list():
@@ -52,6 +53,10 @@ def dj(request):
     for song in get_song_list():
         song = song[25:]
         songlist.append(song)
+    if songlist != []:
+        metadata, albumart = TagExtract(sorted(glob.glob('./static/dropplayer/songs/*.mp3'), key=os.path.getmtime)[0])
+    else:
+        metadata, albumart = TagExtract(None)
     if request.method == "POST":
         form = MusicUpload(request.POST, request.FILES)
         if form.is_valid():
@@ -59,7 +64,7 @@ def dj(request):
             return render(request, 'dropplayer/blank.html')
     else:
         form = MusicUpload()
-    return render(request, 'dropplayer/dj.html', {'musicform':form, 'songlist':songlist})
+    return render(request, 'dropplayer/dj.html', {'musicform':form, 'songlist':songlist, 'albumart': albumart, 'metadata': metadata})
 
 def loading(request):
     return render(request, 'dropplayer/blank.html')

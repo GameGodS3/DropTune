@@ -2,7 +2,6 @@
 {% block content %}
 {% load static %}
 <div class="home">
-    <div class="droptune">DropTune</div>
     <div class="mode dj"  onclick="window.location = '/dj'">
         <div class="disc"></div>
         <div class="stick"></div>
@@ -17,19 +16,16 @@
     </div>
 </div>
 <script>
-    var title = document.getElementsByClassName('droptune')[0];
     var modes = document.getElementsByClassName('mode');
     var cnct = document.getElementsByClassName('connect')[0];
     var ctxt = document.getElementsByClassName('context')[0];
     var qr = document.getElementsByClassName('qr')[0];
-    window.onload = function(){
-        title.id = 'ascend';
+
         for (let i = 0; i < modes.length; i++) {
             const element = modes[i];
             element.id = 'softpop';            
         }
         cnct.id = 'softpop';
-    }
     var flag = 0;
     function showqr(){
         if (flag === 0){

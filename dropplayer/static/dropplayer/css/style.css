@@ -74,7 +74,10 @@ body{
     transition: .5s;
     cursor: pointer;
 }
-
+.modelabel{
+    color: var(--acc);
+    font-size: 30px;
+}
 /* DJ Mode styles*/
 .dj:hover .stick{
     transform: rotate(0deg) scale(1.2);
@@ -203,4 +206,121 @@ body{
     top: 40px;
     left: 60px;
     transform: rotate(20deg);
+}
+/*-------DJ PAGE--------*/
+.djpage{
+    position: absolute;
+    width: 100%;
+    height: 100vh;
+}
+.left{
+    height: 100%;
+    width: 50%;
+    float: left;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+.songlist-container{
+    background-color: var(--sec);
+    color: var(--acc);
+    width: 70%;
+    height: 40%;
+    border-radius: 20px;
+    margin: 5px;
+}
+.songlist{
+    margin: 18px 0;
+    list-style-type: none;
+    padding: 0 20px;
+}
+.songlist li:first-child{
+    background-color: var(--acc);
+    color: var(--sec);
+    border-radius: 10px;
+}
+.songlist li{
+    padding: 8px 5px;
+}
+.choose{
+    padding-top: 10px;
+    width: 70%;
+    text-align: center;
+}
+#song-name{
+    background-color: var(--acc);
+    color: var(--sec);
+    border: none;
+    border-radius: 5px;
+    padding: 10px;  
+    font-size: 16px;
+    width: 80%;
+}
+.djbuttons{
+    display: flex;
+    justify-content: space-evenly;
+    padding: 20px 0 0 0;
+}
+.choose-song{
+    color: var(--acc);
+    background-color: var(--sec);
+    padding: 15px;
+    border-radius: 20px;
+}
+.choose-song:hover{
+    box-shadow: rgba(0, 0, 0, 0.800) 3px 3px 7px;
+    cursor: pointer;
+    transition: all .25s;
+}
+.choose-song:active{
+    background-color: var(--acc);
+    color: var(--sec);
+}
+#sub{
+    color: var(--acc);
+    background-color: var(--sec);
+    padding: 15px;
+    border-radius: 20px;
+    outline: none;
+    border: none;
+    font-family: 'Swis721';
+    font-size: 16px;
+}
+#sub:hover{
+    box-shadow: rgba(0, 0, 0, 0.800) 3px 3px 7px;
+    cursor: pointer;
+    transition: all .25s;
+}
+#sub:active{
+    background-color: var(--acc);
+    color: var(--sec);
+}
+
+
+.right{
+    height: 100%;
+    width: 50%;
+    float: right;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.albumart{
+    max-width: 200px;
+}
+.songtitle{
+    color: var(--acc);
+    margin: 5px 0;
+    font-size: 32px;
+}
+.artist{
+    color: var(--acc);
+    margin: 5px 0;
+}
+.album{
+    color: var(--acc);
+    margin: 5px 0;
+    font-size: 18px;
 }
