@@ -1,6 +1,8 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 import os, glob
+from .qrcodegen import qrgen
+from .tagextract import TagExtract
 from .forms import MusicUpload, saveNewSong, songComplete
 # Create your views here.
 def get_song_list():
@@ -20,7 +22,8 @@ def index(request):
     """
     Renders DropTune homepage
     """
-    return render(request, 'dropplayer/index.html')
+    imgdata, ip = qrgen()
+    return render(request, 'dropplayer/index.html', {'qrcode': imgdata, 'ip': ip})
 
 def player(request):
     """
@@ -46,11 +49,22 @@ def dj(request):
     """
     Renders and manages the uploaded song of the DJ page
     """
+    songlist=[]
+    for song in get_song_list():
+        song = song[25:]
+        songlist.append(song)
+    if songlist != []:
+        metadata, albumart = TagExtract(sorted(glob.glob('./static/dropplayer/songs/*.mp3'), key=os.path.getmtime)[0])
+    else:
+        metadata, albumart = TagExtract(None)
     if request.method == "POST":
         form = MusicUpload(request.POST, request.FILES)
         if form.is_valid():
             saveNewSong(request.FILES['newsong'])
-            return render(request, 'dropplayer/dj.html', {'musicform':form})
+            return render(request, 'dropplayer/blank.html')
     else:
         form = MusicUpload()
-    return render(request, 'dropplayer/dj.html', {'musicform':form})
+    return render(request, 'dropplayer/dj.html', {'musicform':form, 'songlist':songlist, 'albumart': albumart, 'metadata': metadata})
+
+def loading(request):
+    return render(request, 'dropplayer/blank.html')

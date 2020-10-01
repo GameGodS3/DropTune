@@ -1,5 +1,6 @@
 pip3 install -r requirements.txt
 python3 manage.py migrate
-echo firefox http://127.0.0.1:8000 > launch.sh 
-echo python3 manage.py runserver >> launch.sh 
+python3 addip.py
+echo firefox http://0.0.0.0:6969 > launch.sh 
+echo python3 manage.py runserver 0.0.0.0:6969 >> launch.sh 
 chmod +x ./launch.sh && rm install.sh

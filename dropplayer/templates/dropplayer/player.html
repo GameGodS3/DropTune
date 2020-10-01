@@ -4,6 +4,8 @@
 
 <audio autoplay controls id="player"></audio>
 <button onclick="next()">next</button>
+<br>
+<div class="nowplaying" style="color: var(--acc);"></div>
 <form action="/player" method="post" enctype="multipart/form-data" id='endconfirm'>
 {% csrf_token %}
     {{ endconfirm }}
@@ -16,9 +18,9 @@
         document.getElementById('player').play();
         document.getElementById('id_complete').value = 'ended'
         if (document.getElementById('player').getAttribute('src') === "undefined") {
-        alert("Drop a song from DJ mode from any device!");
+            alert("Drop a song from DJ mode from any device!");
         window.location = '/';
-    }
+        }
     }
 
     var songs = [
@@ -46,6 +48,7 @@
     }
     else{
         music_player.src = songs[i];
+        document.getElementsByClassName('nowplaying')[0].innerHTML = songs[i].slice(25, );
         music_player.addEventListener('ended', next, false);
     }
     var flag = 0;
@@ -61,10 +64,11 @@
         music_player.src = songs[i];
         console.log(i);
         if (i!=0){
-        document.getElementById('endconfirm').submit();
+            location.href = '/loading';
+            document.getElementById('endconfirm').submit();
         }
         else{
-            location.reload();
+            location.href = '/loading';
             music_player.src = songs[i+1];
             document.getElementById('endconfirm').submit();
         }

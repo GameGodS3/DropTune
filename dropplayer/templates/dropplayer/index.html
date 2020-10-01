@@ -2,7 +2,6 @@
 {% block content %}
 {% load static %}
 <div class="home">
-    <div class="droptune">DropTune</div>
     <div class="mode dj"  onclick="window.location = '/dj'">
         <div class="disc"></div>
         <div class="stick"></div>
@@ -11,15 +10,35 @@
         <div class="note1 note"></div>
         <div class="note2 note"></div>
     </div>
+    <div class="connect" onclick="showqr()">
+        <div class="context">Connect Your Phone</div>
+        <div class="qr" style="display: none;">Scan this QR <br> or go to <br> {{ ip }}<img src="data:image/png;base64, {{ qrcode }}" alt=""></div>
+    </div>
 </div>
 <script>
-    var title = document.getElementsByClassName('droptune')[0];
     var modes = document.getElementsByClassName('mode');
-    window.onload = function(){
-        title.id = 'ascend';
+    var cnct = document.getElementsByClassName('connect')[0];
+    var ctxt = document.getElementsByClassName('context')[0];
+    var qr = document.getElementsByClassName('qr')[0];
+
         for (let i = 0; i < modes.length; i++) {
             const element = modes[i];
             element.id = 'softpop';            
+        }
+        cnct.id = 'softpop';
+    var flag = 0;
+    function showqr(){
+        if (flag === 0){
+            ctxt.style = "display: none;";
+            qr.removeAttribute('style');
+            qr.id = 'ascend';
+            flag = 1;
+            setTimeout(showqr, 30000);
+        }
+        else{
+            ctxt.removeAttribute('style');
+            qr.style = "display:none;";
+            flag = 0;
         }
     }
 </script>

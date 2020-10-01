@@ -2,10 +2,63 @@
 {% block content %}
 {% load static %}
 
+<div class="djpage">
+    <!--<form action="/dj" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ musicform }}
+    <input type="submit" value="Submit" id="sub" onclick="refrlist()">
+    </form>
 
-<form action="/dj" method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ musicform }}
-<input type="submit" value="Submit">
-</form>
+    <div class="songlist" style="color: #fff;">
+        {% for song in songlist %}
+        {{song}} <br>
+        {% endfor %}
+    </div>-->
+    <div class="left">
+        <div class="modelabel">Up Next</div>
+        <div class="songlist-container">
+            <ul class="songlist">
+                {% if songlist %}
+                {% for song in songlist %}
+                    <li>
+                        {{ song }}
+                    </li>
+                {% endfor %}
+                {% else %}
+                    <li>
+                        Playlist Empty
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+        <div class="choose">
+            <form action="/dj" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ musicform }}
+            <input type="text" name="" id="song-name" disabled placeholder="Choose a Song">
+            <div class="djbuttons">
+                <label for="id_newsong" class="choose-song">Choose Song</label>
+                <input type="submit" value="Submit" id="sub">
+            </div>
+            </form>
+        </div>
+    </div>
+    <div class="right">
+        <img src="data:image/png;base64, {{ albumart }}" alt="Album Art not available" class="albumart">
+        <p class="songtitle">{{ metadata.title }}</p>
+        <p class="artist">{{ metadata.artist }}</p>
+        <p class="album">{{ metadata.album }}</p>
+    </div>
+</div>
+<script>
+
+    var namedisplay = function(e){
+        let file = e.target.files;
+        let show = file[0].name;
+        let output = document.getElementById('song-name');
+        output.value = show;
+    }
+    let fileinput = document.getElementById('id_newsong');
+    fileinput.addEventListener('change', namedisplay);
+</script>
 {% endblock %}
