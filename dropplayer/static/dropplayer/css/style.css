@@ -57,6 +57,8 @@ body{
     font-weight: bold;
     font-size: 50px;
     opacity: 0;
+    user-select: none;
+    cursor: pointer;
 }
 /*MODE*/
 .mode{

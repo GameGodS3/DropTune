@@ -7,15 +7,11 @@
     <link rel="stylesheet" href="{% static 'dropplayer/css/style.css' %}">
     <title>DropTune</title>
 </head>
+<!-- Web App creation and design by Sudev Suresh Sreedevi. Immense gratitude to all the contributors who
+helped make this possible. -->
 <body>
-    <div class="droptune">DropTune</div>
+    <div class="droptune" onclick="location.href = '/'" id="ascend">DropTune</div>
     {% block content %}
     {% endblock %}
 </body>
-<script>
-    var title = document.getElementsByClassName('droptune')[0];
-    window.onload = function(){
-        title.id = 'ascend';
-    }
-</script>
 </html>

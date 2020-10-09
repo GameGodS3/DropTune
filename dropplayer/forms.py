@@ -16,4 +16,4 @@ class MusicUpload(forms.Form):
     newsong = forms.FileField(widget=forms.ClearableFileInput(attrs={'style':'color:white', 'accept':'audio/mpeg', 'hidden':True}), label="")
 
 class songComplete(forms.Form):
-    complete = forms.CharField(label='', widget=forms.TextInput(attrs={'hidden':''}))
+    complete = forms.CharField(label='', widget=forms.TextInput(attrs={'hidden':'', 'value':'ended'}))

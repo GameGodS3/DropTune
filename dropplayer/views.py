@@ -30,8 +30,8 @@ def player(request):
     Renders the music player page
     """
     #list of the names of all the songs
-    song_list = get_song_list()
     if request.method == "POST":
+        song_list = get_song_list()
         form = songComplete(request.POST)
         if form.is_valid():
             print(request.POST['complete'])
@@ -43,6 +43,8 @@ def player(request):
             return render(request, 'dropplayer/player.html', {'songlist': song_list, 'endconfirm': form})
     else:
         form = songComplete()
+    song_list = get_song_list()
+    
     return render(request, 'dropplayer/player.html', {'songlist': song_list, 'endconfirm': form})
 
 def dj(request):

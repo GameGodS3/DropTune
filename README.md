@@ -37,7 +37,7 @@ cd DropTune
 Then
 ### For Linux
 ```bash
-chmod +x ./install.sh
+chmod +x install.sh
 ./install.sh
 ./launch.sh
 ```
@@ -48,9 +48,8 @@ launch.bat
 ```
 Or double click on `install.bat` and then `launch.bat`
 
-If you know how to access your laptop/PC's IP address and connect to the localhost using a mobile or other devices connected to the same network, you could better use the player.
-
-More clear instructions on that part coming up.
+## Connecting other devices
+For connecting a mobile phone or other device, click on the small play button at the bottom right corner and scan the QR Code or enter the shown IP address on the other device.
 
 ---
 ---
@@ -62,10 +61,10 @@ If it still doesn't, close the terminal that opened when you launched the `launc
 Open a fresh terminal in the folder and type
 ##### For Linux
 ```
-python3 manage.py runserver
+python3 manage.py runserver 6969
 ```
 ##### For Windows
 ```
-python manage.py runserver
+python manage.py runserver 6969
 ```
 And then try the URL that comes after it loads.
