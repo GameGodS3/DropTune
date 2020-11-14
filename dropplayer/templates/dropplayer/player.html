@@ -7,6 +7,7 @@
 <br>
 <br>
 <br>
+<div>
 <audio autoplay controls id="player"></audio>
 <form action="/player" method="post" enctype="multipart/form-data" id='endconfirm'>
     {% csrf_token %}
@@ -14,8 +15,16 @@
 <input type="submit" value="Submit" id="ender" hidden>
 <button onclick="next()">Next</button>
 </form>
-<div class="nowplaying" style="color: var(--acc);"></div>
-
+</div>
+<div class="playerpage">
+    <img src="data:image/png;base64, {{ albumart }}" alt="Album Art not available" class="albumart">
+    <p class="songtitle">{{ metadata.title }}</p>
+    <p class="artist">{{ metadata.artist }}</p>
+    <p class="album">{{ metadata.album }}</p>
+    <div class="playercontrols">
+        <input type="range" name="" id="seek">
+    </div>
+</div>
 <script>
     //song array
     var song_list = [
@@ -39,9 +48,6 @@
         alert("Playlist empty. Please drop a song from DJ mode.");
         location.href = "/";
     }
-
-    //Now playing
-    document.getElementsByClassName('nowplaying')[0].innerHTML = song_list[i].slice(25, );
 
 
     player.play();

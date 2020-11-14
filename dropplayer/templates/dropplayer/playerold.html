@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+
+<audio autoplay controls id="player"></audio>
+<button onclick="next()">next</button>
+<br>
+<div class="nowplaying" style="color: var(--acc);"></div>
+<form action="/player" method="post" enctype="multipart/form-data" id='endconfirm'>
+{% csrf_token %}
+    {{ endconfirm }}
+<input type="submit" value="Submit" id="ender" hidden>
+</form>
+
+
+<script>
+
+    window.onload = function(){
+        if (document.getElementById('player').getAttribute('src') === "undefined") {
+            alert("Drop a song from DJ mode from any device!");
+        window.location = '/';//Alerts that the playlist is blank and redirects to homepage for dropping a song.
+        }
+        document.getElementById('player').play();//On loading the player page, the media starts to automatically play. 
+        document.getElementById('id_complete').value = 'ended';//Hidden input gets populated with keyword 'ended' to send a post request to backend for deleting the current song
+    }
+
+    var songs = [
+        {% for song in songlist %}
+        "{{ song }}",
+        {% endfor %}
+    ] //Array of song names
+
+    for (let i = 0; i < songs.length; i++) {
+        songs[i] = songs[i].replace(/&#x27;/g, "'");      
+    } //Unicode character correction for song names that have apostrophe in them.
+
+    var i = 0;
+    var music_player = document.getElementById('player');
+
+    if (music_player === null){
+        throw "Does not exist"
+    }
+    else{
+        music_player.src = songs[i];
+        document.getElementsByClassName('nowplaying')[0].innerHTML = songs[i].slice(25, );
+        music_player.addEventListener('ended', next, false);
+    }
+
+    //next function
+    function next(){
+        music_player.pause();
+        music_player.src = '';
+        document.getElementById('endconfirm').submit();
+    }
+
+</script>
+{% endblock %}
