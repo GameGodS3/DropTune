@@ -1,3 +1,9 @@
 dropplayer/__pycache__
 dropplayer/static/dropplayer/songs
 launch.sh
+Cache
+Session Storage
+__pycache__
+db.sqlite3
+Network Persistent State
+storage.json
