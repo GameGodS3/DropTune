@@ -29,9 +29,13 @@ def player(request):
     """
     Renders the music player page
     """
+    song_list = get_song_list()
+    if song_list != []:
+        metadata, albumart = TagExtract(sorted(glob.glob('./static/dropplayer/songs/*.mp3'), key=os.path.getmtime)[0])
+    else:
+        metadata, albumart = TagExtract(None)
     #list of the names of all the songs
     if request.method == "POST":
-        song_list = get_song_list()
         form = songComplete(request.POST)
         if form.is_valid():
             print(request.POST['complete'])
@@ -40,14 +44,10 @@ def player(request):
                 delsong = 'static/dropplayer/songs/'+song_list[0]
                 os.remove(song_list[0][1:])
                 song_list = song_list[1:]
-            return render(request, 'dropplayer/player.html', {'songlist': song_list, 'endconfirm': form, 'albumart': albumart, 'metadata': metadata})
+            return render(request, 'dropplayer/blank.html')
     else:
         form = songComplete()
-    song_list = get_song_list()
-    if song_list != []:
-        metadata, albumart = TagExtract(sorted(glob.glob('./static/dropplayer/songs/*.mp3'), key=os.path.getmtime)[0])
-    else:
-        metadata, albumart = TagExtract(None)
+    
     return render(request, 'dropplayer/player.html', {'songlist': song_list, 'endconfirm': form, 'albumart': albumart, 'metadata': metadata})
 
 def dj(request):
