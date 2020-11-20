@@ -8,12 +8,12 @@
 <br>
 <br>
 <div>
-<audio autoplay controls id="player"></audio>
+<audio autoplay controls id="player" style="display: none;"></audio>
 <form action="/player" method="post" enctype="multipart/form-data" id='endconfirm'>
     {% csrf_token %}
     {{ endconfirm }}
-<input type="submit" value="Submit" id="ender" hidden>
-<button onclick="next()">Next</button>
+    <input type="submit" value="Submit" id="ender" hidden>
+    <button onclick="next()" style="display: none;" id="nextsub">Next</button>
 </form>
 </div>
 <div class="playerpage">
@@ -21,8 +21,35 @@
     <p class="songtitle">{{ metadata.title }}</p>
     <p class="artist">{{ metadata.artist }}</p>
     <p class="album">{{ metadata.album }}</p>
+    <div class="controls">
+        <div class="playbutton-container">
+            <input type="checkbox" name="playcontrol" id="play" checked>
+            <label for="play" onclick="playpause()">
+                <div class="playbutton"></div>
+            </label>
+        </div>
+        <div class="nextbtn-container">
+            <div class="next" onclick="document.getElementById('nextsub').click()">
+                <div class="nex"></div>
+                <div class="nex"></div>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
+    //Play button mechanics
+    var playinput = document.getElementById("play");
+    function playpause() {
+        if (playinput.checked == false) {
+            player.play()
+        }
+        else{
+            player.pause()
+        }
+    }
+    
+    
+
     //song array
     var song_list = [
         {% for song in songlist %}
@@ -54,7 +81,10 @@
         document.getElementById('ender').click();
         location.href = "/loading"
     }
-
+    
+    if (player.paused){
+            playinput.checked == false;
+        }
     //function for avoiding repeated post requests on reloads (sort of a noob method, ik xP)
     var flag = 0;
     function reloadprotection() {

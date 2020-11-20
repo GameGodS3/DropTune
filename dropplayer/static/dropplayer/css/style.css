@@ -344,3 +344,75 @@ body{
     align-items: center;
     flex-direction: column;
 }
+.controls{
+    margin-top: 20px;
+    display: flex;
+    gap: 5px;
+}
+/*-------Play button--------*/
+
+#play{
+    display: none;
+}
+
+#play:not(:checked)~ label .playbutton{
+    border: solid;
+    border-color:transparent transparent transparent var(--sec);
+    box-sizing: border-box;
+    border-width: 10px 0 10px 20px;
+    display: block;
+    width: 20px;
+    height: 20px;
+    transition: border-width .1s;
+}
+#play:checked ~ label .playbutton{
+    border: double; 
+    border-color: transparent transparent transparent var(--sec);
+    box-sizing: border-box;
+    border-width: 0 0 0 20px;
+    display: block;
+    width: 20px;
+    height: 20px;
+    transition: border-width .1s;
+}
+
+#play ~ label{
+    border-radius: 80px;
+    background-color: var(--acc);
+    padding: 16px 15px 16px 16px;
+    display: block;
+    transform: scale(1.1);
+}
+#play ~ label:hover{
+    cursor: pointer;
+    border-radius: 80px;
+    box-shadow: #00163cdc 5px 5px 8px;
+    background-color: var(--acc);
+    display: block;
+    transition: box-shadow .1s;
+}
+
+/*---Next button-----*/
+
+.next{
+    background-color: var(--acc);
+    display: flex;
+    padding: 16px 10px;
+    border-radius: 50px;
+    transform: scale(.9);
+}
+.nex{
+    border: solid;
+    border-color:transparent transparent transparent var(--sec);
+    box-sizing: border-box;
+    border-width: 10px 0 10px 20px;
+    display: block;
+    width: 20px;
+    height: 20px;
+    transform: scale(.8);
+    transition: border-width .1s;
+}
+
+.next:hover{
+    cursor: pointer;
+}
