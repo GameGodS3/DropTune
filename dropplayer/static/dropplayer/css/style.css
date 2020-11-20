@@ -344,11 +344,3 @@ body{
     align-items: center;
     flex-direction: column;
 }
-#seek{
-    width: 70vw;
-    background-color: var(--acc);
-}
-
-#seek::-webkit-slider-thumb{
-    background-color: var(--acc);
-}
