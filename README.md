@@ -20,7 +20,7 @@ Requires python3 and pip3 installed in the Laptop/PC.
 
 ## Installation
 
-Download this repo as zip and extract
+Go to __Releases__ and download the source code.
 
 OR
 
