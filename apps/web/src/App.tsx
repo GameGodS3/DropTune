@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TrackMetadata } from "@droptune/shared-types";
+import type { ControlPlaneEvent } from "@droptune/protocol";
+import type { QueueItem, TrackMetadata } from "@droptune/shared-types";
 import { filterSupportedFiles, indexFiles } from "./lib/metadata";
+import { makeId } from "./lib/id";
 import { selectFilteredTracks, useLibraryStore } from "./stores/libraryStore";
 import { usePeerStore } from "./stores/peerStore";
 import { usePlaybackStore } from "./stores/playbackStore";
 import { useQueueStore } from "./stores/queueStore";
+import { useRoomStore } from "./stores/roomStore";
 
 type ExtendedWindow = Window & {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -42,6 +45,14 @@ function formatSize(bytes: number): string {
 }
 
 export function App() {
+  const coordinatorHost = window.location.hostname || "localhost";
+  const coordinatorBaseUrl = `http://${coordinatorHost}:8787`;
+  const wsUrl = `ws://${coordinatorHost}:8787/ws`;
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const [rooms, setRooms] = useState<Array<{ roomId: string; roomName: string; participantCount: number }>>([]);
+  const [roomNameInput, setRoomNameInput] = useState("Living Room");
+  const [roomError, setRoomError] = useState<string | null>(null);
   const [indexError, setIndexError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [activeQueueItemId, setActiveQueueItemId] = useState<string | undefined>();
@@ -50,14 +61,21 @@ export function App() {
     useLibraryStore();
   const filtered = useMemo(() => selectFilteredTracks(useLibraryStore.getState()), [tracks, query]);
 
-  const { peerId } = usePeerStore();
-  const { queue, addToQueue, removeFromQueue, moveQueueItem } = useQueueStore();
+  const { peerId, displayName } = usePeerStore();
+  const roomStore = useRoomStore();
+  const { queue, setQueue, addToQueue, removeFromQueue, moveQueueItem } = useQueueStore();
   const playback = usePlaybackStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    void refreshRooms();
+    const timer = window.setInterval(() => void refreshRooms(), 3000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -87,12 +105,90 @@ export function App() {
     };
   }, [playback, queue, activeQueueItemId]);
 
+  function sendEvent(event: ControlPlaneEvent) {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(event));
+    }
+  }
+
+  function onRoomState(event: Extract<ControlPlaneEvent, { type: "ROOM_STATE" }>) {
+    const { room } = event.payload;
+    setQueue(room.queue);
+    playback.hydrateFromRemote({
+      status: room.playback.status,
+      positionSec: room.playback.positionSec,
+      durationSec: room.playback.durationSec,
+      currentTrackId: room.playback.currentQueueItemId
+    });
+    const host = room.participants.find((p) => p.isHost);
+    roomStore.setPresence(room.participants.length, host?.peerId);
+    roomStore.setRoom(room.roomId, room.roomName);
+  }
+
+  function connectRoom(roomId: string, roomName: string) {
+    wsRef.current?.close();
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      roomStore.setRoom(roomId, roomName);
+      roomStore.setConnected(true);
+      const joinEvent: ControlPlaneEvent = {
+        type: "JOIN_ROOM",
+        sentAt: Date.now(),
+        payload: { roomId, peerId, displayName }
+      };
+      ws.send(JSON.stringify(joinEvent));
+    };
+
+    ws.onmessage = (message) => {
+      let event: ControlPlaneEvent;
+      try {
+        event = JSON.parse(String(message.data)) as ControlPlaneEvent;
+      } catch {
+        return;
+      }
+      if (event.type === "ROOM_STATE") onRoomState(event);
+    };
+
+    ws.onclose = () => {
+      roomStore.setConnected(false);
+    };
+  }
+
+  async function refreshRooms() {
+    try {
+      const response = await fetch(`${coordinatorBaseUrl}/rooms`);
+      const data = (await response.json()) as { rooms: Array<{ roomId: string; roomName: string; participantCount: number }> };
+      setRooms(data.rooms);
+    } catch {
+      setRoomError("Coordinator is not reachable. Start local coordinator to enable room sync.");
+    }
+  }
+
+  async function createRoom() {
+    setRoomError(null);
+    try {
+      const response = await fetch(`${coordinatorBaseUrl}/rooms/create`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ roomName: roomNameInput })
+      });
+      if (!response.ok) throw new Error("create room failed");
+      const data = (await response.json()) as { roomId: string; roomName: string };
+      await refreshRooms();
+      connectRoom(data.roomId, data.roomName);
+    } catch {
+      setRoomError("Failed to create room");
+    }
+  }
+
   async function ingestFiles(files: File[]) {
     setIndexError(null);
     setIndexing(true);
     try {
       const supportedFiles = filterSupportedFiles(files);
-      const importable = supportedFiles.map((file) => ({ id: crypto.randomUUID(), file }));
+      const importable = supportedFiles.map((file) => ({ id: makeId(), file }));
       const indexed = await indexFiles(peerId, importable);
       await upsertTracks(indexed, importable);
     } catch (error) {
@@ -137,6 +233,47 @@ export function App() {
     await playTrack(track);
   }
 
+  function emitQueueAdd(trackId: string) {
+    if (!roomStore.roomId || !roomStore.isConnected) {
+      addToQueue(trackId, peerId);
+      return;
+    }
+    const item: QueueItem = { id: makeId(), trackId, requestedBy: peerId, addedAt: Date.now() };
+    const event: ControlPlaneEvent = {
+      type: "QUEUE_ADD",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, item }
+    };
+    sendEvent(event);
+  }
+
+  function emitQueueRemove(queueItemId: string) {
+    if (!roomStore.roomId || !roomStore.isConnected) {
+      removeFromQueue(queueItemId);
+      return;
+    }
+    sendEvent({
+      type: "QUEUE_REMOVE",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, queueItemId }
+    });
+  }
+
+  function emitQueueReorder(fromIndex: number, toIndex: number) {
+    if (!roomStore.roomId || !roomStore.isConnected) {
+      moveQueueItem(fromIndex, toIndex);
+      return;
+    }
+    const reordered = [...queue];
+    const [item] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, item);
+    sendEvent({
+      type: "QUEUE_REORDER",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, queue: reordered }
+    });
+  }
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl p-6">
       <audio ref={audioRef} preload="metadata" />
@@ -153,19 +290,62 @@ export function App() {
         }}
       />
 
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">DropTune - Phase 1</h1>
-        <button
-          type="button"
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
-          onClick={() => void onSelectFolder()}
-          disabled={isIndexing}
-        >
-          {isIndexing ? "Indexing..." : "Select Music Folder"}
-        </button>
+      <header className="mb-6">
+        <h1 className="mb-4 text-2xl font-semibold">DropTune - Phase 2/3</h1>
+        <div className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <p className="mb-2 text-sm text-slate-300">Nearby Rooms</p>
+            <div className="flex flex-wrap gap-2">
+              {rooms.map((room) => (
+                <button
+                  key={room.roomId}
+                  type="button"
+                  className="rounded border border-slate-700 bg-slate-950 px-3 py-1 text-sm hover:bg-slate-800"
+                  onClick={() => connectRoom(room.roomId, room.roomName)}
+                >
+                  {room.roomName} ({room.participantCount})
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-sm text-slate-300">Create Room</p>
+            <div className="flex gap-2">
+              <input
+                value={roomNameInput}
+                onChange={(event) => setRoomNameInput(event.target.value)}
+                className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              />
+              <button
+                type="button"
+                className="rounded bg-indigo-600 px-3 py-1 text-sm hover:bg-indigo-500"
+                onClick={() => void createRoom()}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+          <span>Room: {roomStore.roomName ?? "Not connected"}</span>
+          <span>Participants: {roomStore.participantCount}</span>
+          <span>Host: {roomStore.hostPeerId ? roomStore.hostPeerId.slice(0, 8) : "-"}</span>
+          <span>Socket: {roomStore.isConnected ? "Connected" : "Offline"}</span>
+        </div>
+        <div className="mt-4">
+          <button
+            type="button"
+            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
+            onClick={() => void onSelectFolder()}
+            disabled={isIndexing}
+          >
+            {isIndexing ? "Indexing..." : "Select Music Folder"}
+          </button>
+        </div>
       </header>
 
-      {indexError ? <p className="mb-4 text-sm text-red-400">{indexError}</p> : null}
+      {indexError ? <p className="mb-2 text-sm text-red-400">{indexError}</p> : null}
+      {roomError ? <p className="mb-4 text-sm text-amber-400">{roomError}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded border border-slate-800 bg-slate-900 p-4">
@@ -201,7 +381,7 @@ export function App() {
                   <button
                     type="button"
                     className="rounded bg-emerald-700 px-2 py-1 hover:bg-emerald-600"
-                    onClick={() => addToQueue(track.id, peerId)}
+                    onClick={() => emitQueueAdd(track.id)}
                   >
                     Queue
                   </button>
@@ -233,7 +413,7 @@ export function App() {
                       type="button"
                       className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 disabled:opacity-40"
                       disabled={index === 0}
-                      onClick={() => moveQueueItem(index, index - 1)}
+                      onClick={() => emitQueueReorder(index, index - 1)}
                     >
                       Up
                     </button>
@@ -241,14 +421,14 @@ export function App() {
                       type="button"
                       className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 disabled:opacity-40"
                       disabled={index === queue.length - 1}
-                      onClick={() => moveQueueItem(index, index + 1)}
+                      onClick={() => emitQueueReorder(index, index + 1)}
                     >
                       Down
                     </button>
                     <button
                       type="button"
                       className="rounded bg-red-700 px-2 py-1 hover:bg-red-600"
-                      onClick={() => removeFromQueue(item.id)}
+                      onClick={() => emitQueueRemove(item.id)}
                     >
                       Remove
                     </button>

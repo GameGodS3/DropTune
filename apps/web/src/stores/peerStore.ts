@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { makeId } from "../lib/id";
 
 interface PeerStoreState {
   peerId: string;
@@ -7,7 +8,7 @@ interface PeerStoreState {
 }
 
 export const usePeerStore = create<PeerStoreState>((set) => ({
-  peerId: crypto.randomUUID(),
+  peerId: makeId(),
   displayName: "Local User",
   setDisplayName: (name) => set({ displayName: name })
 }));

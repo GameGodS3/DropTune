@@ -5,7 +5,8 @@ LAN-first collaborative music playback for offline local networks.
 ## Current status
 
 - Phase 1 implemented: local folder indexing, search, queue, and playback.
-- Coordinator scaffold implemented for Phase 2/3: health/rooms HTTP, ws relay, mDNS advertisement.
+- Phase 2 implemented: room create/list/join over local coordinator APIs.
+- Phase 3 baseline implemented: room-scoped websocket sync with authoritative coordinator queue/playback state.
 - Shared protocol and domain types are centralized in workspace packages.
 
 ## Monorepo structure
@@ -54,7 +55,7 @@ All messages use:
 - `peerStore`: local peer identity and display name
 - `transferStore`: transfer status placeholder for Phase 5
 
-## Coordinator architecture (phase-2 foundation)
+## Coordinator architecture
 
 `apps/coordinator/src/index.ts`:
 
@@ -65,8 +66,12 @@ All messages use:
 - WebSocket:
   - endpoint: `/ws`
   - room join/leave tracking
-  - room-state broadcast
-  - generic control event relay
+  - room-scoped membership routing
+  - authoritative queue and playback updates on:
+    - `QUEUE_ADD`, `QUEUE_REMOVE`, `QUEUE_REORDER`
+    - `PLAY`, `PAUSE`, `SEEK`, `PLAYBACK_STATE`, `HOST_CHANGE`
+  - room-state snapshots (`ROOM_STATE`) emitted after authoritative updates
+  - signaling relay for `FILE_REQUEST`, `FILE_AVAILABLE`, `WEBRTC_SIGNAL`
 - mDNS advertisement:
   - service `_droptune._tcp.local` (type `droptune`, protocol `tcp`)
 
@@ -146,8 +151,6 @@ pnpm build
 
 ## Next incremental phases
 
-- Phase 2: room client wiring + room discovery UI from mDNS/HTTP.
-- Phase 3: strict room-scoped ws sync and authoritative queue/playback event handling.
 - Phase 4: host-authoritative playback controls and state broadcasts.
 - Phase 5: WebRTC chunked file transfer.
 - Phase 6: local-first track matching before requesting transfer.

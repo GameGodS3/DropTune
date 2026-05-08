@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import type { QueueItem } from "@droptune/shared-types";
+import { makeId } from "../lib/id";
 
 interface QueueState {
   queue: QueueItem[];
+  setQueue: (queue: QueueItem[]) => void;
   addToQueue: (trackId: string, requestedBy: string) => QueueItem;
   removeFromQueue: (queueItemId: string) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
@@ -10,9 +12,10 @@ interface QueueState {
 
 export const useQueueStore = create<QueueState>((set) => ({
   queue: [],
+  setQueue: (queue) => set({ queue }),
   addToQueue: (trackId, requestedBy) => {
     const item: QueueItem = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       trackId,
       requestedBy,
       addedAt: Date.now()

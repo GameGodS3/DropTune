@@ -1,7 +1,9 @@
 import express from "express";
+import cors from "cors";
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { Bonjour } from "bonjour-service";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import type { ControlPlaneEvent } from "@droptune/protocol";
 import type { PlaybackState, QueueItem, RoomState } from "@droptune/shared-types";
 
@@ -17,8 +19,17 @@ type Room = {
 
 const rooms = new Map<string, Room>();
 const socketIndex = new Map<string, { roomId: string; peerId: string }>();
+const roomSockets = new Map<string, Set<string>>();
+const wsByClientId = new Map<string, WebSocket>();
 
 const app = express();
+app.use(
+  cors({
+    origin: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: false
+  })
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -41,7 +52,7 @@ app.post("/rooms/create", (req, res) => {
     return;
   }
 
-  const roomId = crypto.randomUUID();
+  const roomId = randomUUID();
   const room: Room = {
     roomId,
     roomName,
@@ -76,20 +87,28 @@ function toRoomState(room: Room): RoomState {
   };
 }
 
+function sendToRoom(roomId: string, event: ControlPlaneEvent): void {
+  const encoded = JSON.stringify(event);
+  const members = roomSockets.get(roomId);
+  if (!members) return;
+  for (const wsClientId of members) {
+    const client = wsByClientId.get(wsClientId);
+    if (client && client.readyState === client.OPEN) client.send(encoded);
+  }
+}
+
 function emitRoomState(room: Room): void {
   const event: ControlPlaneEvent = {
     type: "ROOM_STATE",
     sentAt: Date.now(),
     payload: { room: toRoomState(room) }
   };
-  const encoded = JSON.stringify(event);
-  wss.clients.forEach((client) => {
-    if (client.readyState === client.OPEN) client.send(encoded);
-  });
+  sendToRoom(room.roomId, event);
 }
 
 wss.on("connection", (socket) => {
-  const wsClientId = crypto.randomUUID();
+  const wsClientId = randomUUID();
+  wsByClientId.set(wsClientId, socket);
 
   socket.on("message", (raw) => {
     let event: ControlPlaneEvent;
@@ -110,6 +129,8 @@ wss.on("connection", (socket) => {
         wsClientId
       });
       socketIndex.set(wsClientId, { roomId: room.roomId, peerId: event.payload.peerId });
+      if (!roomSockets.has(room.roomId)) roomSockets.set(room.roomId, new Set());
+      roomSockets.get(room.roomId)?.add(wsClientId);
       emitRoomState(room);
       return;
     }
@@ -121,24 +142,75 @@ wss.on("connection", (socket) => {
 
     if (event.type === "LEAVE_ROOM") {
       room.participants.delete(membership.peerId);
+      roomSockets.get(room.roomId)?.delete(wsClientId);
       socketIndex.delete(wsClientId);
       emitRoomState(room);
       return;
     }
 
-    // broadcast every other control-plane event to all clients for now.
-    // phase 3+ will tighten authorization and room-only routing.
-    const encoded = JSON.stringify(event);
-    wss.clients.forEach((client) => {
-      if (client.readyState === client.OPEN) client.send(encoded);
-    });
+    if ("roomId" in event.payload && event.payload.roomId !== room.roomId) return;
+
+    switch (event.type) {
+      case "QUEUE_ADD":
+        room.queue.push(event.payload.item);
+        emitRoomState(room);
+        break;
+      case "QUEUE_REMOVE":
+        room.queue = room.queue.filter((item) => item.id !== event.payload.queueItemId);
+        emitRoomState(room);
+        break;
+      case "QUEUE_REORDER":
+        room.queue = event.payload.queue;
+        emitRoomState(room);
+        break;
+      case "PLAY":
+        room.playback = {
+          ...room.playback,
+          status: "playing",
+          currentQueueItemId: event.payload.queueItemId,
+          updatedAt: Date.now()
+        };
+        emitRoomState(room);
+        break;
+      case "PAUSE":
+        room.playback = { ...room.playback, status: "paused", updatedAt: Date.now() };
+        emitRoomState(room);
+        break;
+      case "SEEK":
+        room.playback = {
+          ...room.playback,
+          positionSec: event.payload.positionSec,
+          updatedAt: Date.now()
+        };
+        emitRoomState(room);
+        break;
+      case "PLAYBACK_STATE":
+        room.playback = { ...event.payload.state, updatedAt: Date.now() };
+        emitRoomState(room);
+        break;
+      case "HOST_CHANGE":
+        for (const participant of room.participants.values()) {
+          participant.isHost = participant.peerId === event.payload.nextHostPeerId;
+        }
+        emitRoomState(room);
+        break;
+      case "FILE_REQUEST":
+      case "FILE_AVAILABLE":
+      case "WEBRTC_SIGNAL":
+        sendToRoom(room.roomId, event);
+        break;
+      default:
+        break;
+    }
   });
 
   socket.on("close", () => {
     const membership = socketIndex.get(wsClientId);
+    wsByClientId.delete(wsClientId);
     if (!membership) return;
     const room = rooms.get(membership.roomId);
     room?.participants.delete(membership.peerId);
+    roomSockets.get(membership.roomId)?.delete(wsClientId);
     socketIndex.delete(wsClientId);
     if (room) emitRoomState(room);
   });
