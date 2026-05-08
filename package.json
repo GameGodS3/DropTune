@@ -1,0 +1,12 @@
+{
+  "name": "droptune",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @droptune/web dev",
+    "dev:coordinator": "pnpm --filter @droptune/coordinator dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
