@@ -12,6 +12,27 @@ function normalizeName(input: string): string {
   return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function hashText(input: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash +=
+      (hash << 1) +
+      (hash << 4) +
+      (hash << 7) +
+      (hash << 8) +
+      (hash << 24);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function buildTrackId(track: Pick<TrackMetadata, "fileName" | "title" | "durationSec">): string {
+  const normalizedFile = normalizeName(track.fileName);
+  const normalizedTitle = normalizeName(track.title);
+  const durationBucket = Math.round(Number(track.durationSec || 0));
+  return `trk-${hashText(`${normalizedFile}|${normalizedTitle}|${durationBucket}`)}`;
+}
+
 function inferFormat(fileName: string): TrackMetadata["format"] {
   const ext = fileName.split(".").pop()?.toLowerCase();
   if (!ext) return "unknown";

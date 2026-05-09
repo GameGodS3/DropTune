@@ -42,7 +42,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   },
   hydrate: async () => {
     const tracks = await loadTracks();
-    set({ tracks });
+    set({ tracks: tracks.filter((t) => t.id.startsWith("trk-")) });
   }
 }));
 

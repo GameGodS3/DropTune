@@ -13,8 +13,11 @@ interface DropTuneDb extends DBSchema {
   };
 }
 
-export const dbPromise = openDB<DropTuneDb>("droptune-db", 1, {
-  upgrade(db) {
+export const dbPromise = openDB<DropTuneDb>("droptune-db", 2, {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 2 && db.objectStoreNames.contains("tracks")) {
+      db.deleteObjectStore("tracks");
+    }
     const trackStore = db.createObjectStore("tracks", { keyPath: "id" });
     trackStore.createIndex("by-title", "title");
     trackStore.createIndex("by-normalized-name", "normalizedName");

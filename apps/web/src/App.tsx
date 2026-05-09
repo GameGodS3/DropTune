@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ControlPlaneEvent } from "@droptune/protocol";
 import type { QueueItem, TrackMetadata } from "@droptune/shared-types";
-import { filterSupportedFiles, indexFiles } from "./lib/metadata";
+import { buildTrackId, filterSupportedFiles, indexFiles } from "./lib/metadata";
 import { makeId } from "./lib/id";
 import { selectFilteredTracks, useLibraryStore } from "./stores/libraryStore";
 import { usePeerStore } from "./stores/peerStore";
@@ -54,8 +54,10 @@ export function App() {
   const [roomNameInput, setRoomNameInput] = useState("Living Room");
   const [roomError, setRoomError] = useState<string | null>(null);
   const [indexError, setIndexError] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [activeQueueItemId, setActiveQueueItemId] = useState<string | undefined>();
+  const lastPlaybackEmitRef = useRef(0);
 
   const { tracks, localFiles, query, isIndexing, setQuery, setIndexing, upsertTracks, hydrate } =
     useLibraryStore();
@@ -77,18 +79,51 @@ export function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  function emitPlaybackState() {
+    if (!roomStore.roomId || !roomStore.isConnected) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    sendEvent({
+      type: "PLAYBACK_STATE",
+      sentAt: Date.now(),
+      payload: {
+        roomId: roomStore.roomId,
+        state: {
+          status: playback.status,
+          currentQueueItemId: activeQueueItemId,
+          positionSec: audio.currentTime || playback.positionSec,
+          durationSec: audio.duration || playback.durationSec,
+          updatedAt: Date.now()
+        }
+      }
+    });
+  }
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onTimeUpdate = () => playback.setPosition(audio.currentTime);
+    const onTimeUpdate = () => {
+      playback.setPosition(audio.currentTime);
+      if (roomStore.isConnected && roomStore.roomId && Date.now() - lastPlaybackEmitRef.current > 1000) {
+        lastPlaybackEmitRef.current = Date.now();
+        emitPlaybackState();
+      }
+    };
     const onLoadedMetadata = () => playback.setDuration(audio.duration || 0);
-    const onPlay = () => playback.setStatus("playing");
-    const onPause = () => playback.setStatus("paused");
+    const onPlay = () => {
+      playback.setStatus("playing");
+      emitPlaybackState();
+    };
+    const onPause = () => {
+      playback.setStatus("paused");
+      emitPlaybackState();
+    };
     const onEnded = () => {
       playback.setStatus("ended");
+      emitPlaybackState();
       const currentIndex = queue.findIndex((item) => item.id === activeQueueItemId);
       if (currentIndex >= 0 && currentIndex < queue.length - 1) {
-        void playQueueItem(queue[currentIndex + 1].id);
+        void playQueueItem(queue[currentIndex + 1].id, true);
       }
     };
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -103,7 +138,7 @@ export function App() {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [playback, queue, activeQueueItemId]);
+  }, [playback, queue, activeQueueItemId, roomStore.isConnected, roomStore.roomId]);
 
   function sendEvent(event: ControlPlaneEvent) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -114,6 +149,7 @@ export function App() {
   function onRoomState(event: Extract<ControlPlaneEvent, { type: "ROOM_STATE" }>) {
     const { room } = event.payload;
     setQueue(room.queue);
+    setActiveQueueItemId(room.playback.currentQueueItemId);
     playback.hydrateFromRemote({
       status: room.playback.status,
       positionSec: room.playback.positionSec,
@@ -123,6 +159,25 @@ export function App() {
     const host = room.participants.find((p) => p.isHost);
     roomStore.setPresence(room.participants.length, host?.peerId);
     roomStore.setRoom(room.roomId, room.roomName);
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (room.playback.status === "paused" && !audio.paused) {
+      audio.pause();
+    }
+
+    if (room.playback.status === "playing" && room.playback.currentQueueItemId) {
+      if (activeQueueItemId !== room.playback.currentQueueItemId) {
+        void playQueueItem(room.playback.currentQueueItemId, false);
+      } else if (audio.paused) {
+        void audio.play().catch(() => undefined);
+      }
+    }
+
+    if (Math.abs((audio.currentTime || 0) - room.playback.positionSec) > 1.5) {
+      audio.currentTime = room.playback.positionSec;
+    }
   }
 
   function connectRoom(roomId: string, roomName: string) {
@@ -161,6 +216,7 @@ export function App() {
       const response = await fetch(`${coordinatorBaseUrl}/rooms`);
       const data = (await response.json()) as { rooms: Array<{ roomId: string; roomName: string; participantCount: number }> };
       setRooms(data.rooms);
+      setRoomError(null);
     } catch {
       setRoomError("Coordinator is not reachable. Start local coordinator to enable room sync.");
     }
@@ -190,7 +246,9 @@ export function App() {
       const supportedFiles = filterSupportedFiles(files);
       const importable = supportedFiles.map((file) => ({ id: makeId(), file }));
       const indexed = await indexFiles(peerId, importable);
-      await upsertTracks(indexed, importable);
+      const rekeyed = indexed.map((track) => ({ ...track, id: buildTrackId(track) }));
+      const fileMap = rekeyed.map((track, i) => ({ id: track.id, file: importable[i].file }));
+      await upsertTracks(rekeyed, fileMap);
     } catch (error) {
       setIndexError(error instanceof Error ? error.message : "Failed to index files");
     } finally {
@@ -213,23 +271,55 @@ export function App() {
     inputRef.current?.click();
   }
 
+  function resolvePlayableTrack(item: QueueItem): TrackMetadata | undefined {
+    const exact = tracks.find((t) => t.id === item.trackId);
+    if (exact) return exact;
+
+    const target = tracks.find((candidate) => {
+      const candidateId = buildTrackId(candidate);
+      return candidateId === item.trackId;
+    });
+    if (target) return target;
+
+    return undefined;
+  }
+
   async function playTrack(track: TrackMetadata) {
+    setPlaybackError(null);
     const file = localFiles[track.id];
-    if (!file || !audioRef.current) return;
+    if (!file || !audioRef.current) {
+      setPlaybackError("Track file is unavailable on this device. Re-index this folder on the current device.");
+      return;
+    }
     playback.setCurrentTrack(track.id);
     playback.setStatus("loading");
     const url = URL.createObjectURL(file);
     const audio = audioRef.current;
     audio.src = url;
-    await audio.play();
+    try {
+      await audio.play();
+    } catch (error) {
+      setPlaybackError(error instanceof Error ? error.message : "Playback failed on this browser/device.");
+      playback.setStatus("error");
+    }
   }
 
-  async function playQueueItem(queueItemId: string) {
+  async function playQueueItem(queueItemId: string, emitPlayEvent = true) {
     const item = queue.find((q) => q.id === queueItemId);
     if (!item) return;
-    const track = tracks.find((t) => t.id === item.trackId);
-    if (!track) return;
+    const track = resolvePlayableTrack(item);
+    if (!track) {
+      setPlaybackError("No locally playable copy found for this queued track on current device.");
+      return;
+    }
     setActiveQueueItemId(queueItemId);
+    if (emitPlayEvent && roomStore.roomId && roomStore.isConnected) {
+      sendEvent({
+        type: "PLAY",
+        sentAt: Date.now(),
+        payload: { roomId: roomStore.roomId, queueItemId }
+      });
+    }
     await playTrack(track);
   }
 
@@ -271,6 +361,23 @@ export function App() {
       type: "QUEUE_REORDER",
       sentAt: Date.now(),
       payload: { roomId: roomStore.roomId, queue: reordered }
+    });
+  }
+
+  function emitPause() {
+    if (!roomStore.roomId || !roomStore.isConnected) {
+      audioRef.current?.pause();
+      return;
+    }
+    sendEvent({ type: "PAUSE", sentAt: Date.now(), payload: { roomId: roomStore.roomId } });
+  }
+
+  function emitSeek(positionSec: number) {
+    if (!roomStore.roomId || !roomStore.isConnected) return;
+    sendEvent({
+      type: "SEEK",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, positionSec }
     });
   }
 
@@ -346,6 +453,7 @@ export function App() {
 
       {indexError ? <p className="mb-2 text-sm text-red-400">{indexError}</p> : null}
       {roomError ? <p className="mb-4 text-sm text-amber-400">{roomError}</p> : null}
+      {playbackError ? <p className="mb-4 text-sm text-red-400">{playbackError}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded border border-slate-800 bg-slate-900 p-4">
@@ -448,16 +556,46 @@ export function App() {
               <button
                 type="button"
                 className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
-                onClick={() => audioRef.current?.play()}
+                onClick={() => {
+                  if (activeQueueItemId) {
+                    void playQueueItem(activeQueueItemId, true);
+                  } else {
+                    void audioRef.current?.play();
+                  }
+                }}
               >
                 Resume
               </button>
               <button
                 type="button"
                 className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
-                onClick={() => audioRef.current?.pause()}
+                onClick={() => emitPause()}
               >
                 Pause
+              </button>
+              <button
+                type="button"
+                className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
+                onClick={() => {
+                  const nextPos = Math.max(0, (audioRef.current?.currentTime ?? 0) - 10);
+                  if (audioRef.current) audioRef.current.currentTime = nextPos;
+                  emitSeek(nextPos);
+                }}
+              >
+                -10s
+              </button>
+              <button
+                type="button"
+                className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
+                onClick={() => {
+                  const current = audioRef.current?.currentTime ?? 0;
+                  const duration = audioRef.current?.duration ?? playback.durationSec;
+                  const nextPos = Math.min(duration || current + 10, current + 10);
+                  if (audioRef.current) audioRef.current.currentTime = nextPos;
+                  emitSeek(nextPos);
+                }}
+              >
+                +10s
               </button>
             </div>
           </div>
