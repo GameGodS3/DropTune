@@ -65,6 +65,7 @@ export function App() {
 
   const { peerId, displayName } = usePeerStore();
   const roomStore = useRoomStore();
+  const isHost = !roomStore.roomId || !roomStore.isConnected || peerId === roomStore.hostPeerId;
   const { queue, setQueue, addToQueue, removeFromQueue, moveQueueItem } = useQueueStore();
   const playback = usePlaybackStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -80,7 +81,7 @@ export function App() {
   }, []);
 
   function emitPlaybackState() {
-    if (!roomStore.roomId || !roomStore.isConnected) return;
+    if (!roomStore.roomId || !roomStore.isConnected || !isHost) return;
     const audio = audioRef.current;
     if (!audio) return;
     sendEvent({
@@ -138,7 +139,7 @@ export function App() {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [playback, queue, activeQueueItemId, roomStore.isConnected, roomStore.roomId]);
+  }, [playback, queue, activeQueueItemId, roomStore.isConnected, roomStore.roomId, roomStore.hostPeerId]);
 
   function sendEvent(event: ControlPlaneEvent) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -159,6 +160,8 @@ export function App() {
     const host = room.participants.find((p) => p.isHost);
     roomStore.setPresence(room.participants.length, host?.peerId);
     roomStore.setRoom(room.roomId, room.roomName);
+
+    if (!isHost) return;
 
     const audio = audioRef.current;
     if (!audio) return;
@@ -307,11 +310,6 @@ export function App() {
   async function playQueueItem(queueItemId: string, emitPlayEvent = true) {
     const item = queue.find((q) => q.id === queueItemId);
     if (!item) return;
-    const track = resolvePlayableTrack(item);
-    if (!track) {
-      setPlaybackError("No locally playable copy found for this queued track on current device.");
-      return;
-    }
     setActiveQueueItemId(queueItemId);
     if (emitPlayEvent && roomStore.roomId && roomStore.isConnected) {
       sendEvent({
@@ -319,6 +317,12 @@ export function App() {
         sentAt: Date.now(),
         payload: { roomId: roomStore.roomId, queueItemId }
       });
+    }
+    if (!isHost) return;
+    const track = resolvePlayableTrack(item);
+    if (!track) {
+      setPlaybackError("No locally playable copy found for this queued track on current device.");
+      return;
     }
     await playTrack(track);
   }
@@ -372,6 +376,15 @@ export function App() {
     sendEvent({ type: "PAUSE", sentAt: Date.now(), payload: { roomId: roomStore.roomId } });
   }
 
+  function emitBecomeHost() {
+    if (!roomStore.roomId || !roomStore.isConnected) return;
+    sendEvent({
+      type: "HOST_CHANGE",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, nextHostPeerId: peerId }
+    });
+  }
+
   function emitSeek(positionSec: number) {
     if (!roomStore.roomId || !roomStore.isConnected) return;
     sendEvent({
@@ -398,7 +411,7 @@ export function App() {
       />
 
       <header className="mb-6">
-        <h1 className="mb-4 text-2xl font-semibold">DropTune - Phase 2/3</h1>
+        <h1 className="mb-4 text-2xl font-semibold">DropTune - Phase 4</h1>
         <div className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4 md:grid-cols-3">
           <div className="md:col-span-2">
             <p className="mb-2 text-sm text-slate-300">Nearby Rooms</p>
@@ -436,8 +449,24 @@ export function App() {
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-300">
           <span>Room: {roomStore.roomName ?? "Not connected"}</span>
           <span>Participants: {roomStore.participantCount}</span>
-          <span>Host: {roomStore.hostPeerId ? roomStore.hostPeerId.slice(0, 8) : "-"}</span>
+          <span>
+            Role:{" "}
+            {roomStore.isConnected
+              ? isHost
+                ? <span className="font-semibold text-emerald-400">Host</span>
+                : <span className="text-slate-400">Listener</span>
+              : "-"}
+          </span>
           <span>Socket: {roomStore.isConnected ? "Connected" : "Offline"}</span>
+          {roomStore.isConnected && !isHost && (
+            <button
+              type="button"
+              className="rounded bg-indigo-700 px-3 py-1 text-xs hover:bg-indigo-600"
+              onClick={emitBecomeHost}
+            >
+              Become Host
+            </button>
+          )}
         </div>
         <div className="mt-4">
           <button
@@ -481,7 +510,9 @@ export function App() {
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
-                    className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
+                    className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 disabled:opacity-40"
+                    disabled={!isHost}
+                    title={!isHost ? "Only the host can play directly. Queue the track instead." : undefined}
                     onClick={() => void playTrack(track)}
                   >
                     Play

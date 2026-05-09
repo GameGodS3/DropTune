@@ -97,6 +97,13 @@ function sendToRoom(roomId: string, event: ControlPlaneEvent): void {
   }
 }
 
+function reassignHostIfNeeded(room: Room): void {
+  const hasHost = Array.from(room.participants.values()).some((p) => p.isHost);
+  if (!hasHost && room.participants.size > 0) {
+    room.participants.values().next().value!.isHost = true;
+  }
+}
+
 function emitRoomState(room: Room): void {
   const event: ControlPlaneEvent = {
     type: "ROOM_STATE",
@@ -144,6 +151,7 @@ wss.on("connection", (socket) => {
       room.participants.delete(membership.peerId);
       roomSockets.get(room.roomId)?.delete(wsClientId);
       socketIndex.delete(wsClientId);
+      reassignHostIfNeeded(room);
       emitRoomState(room);
       return;
     }
@@ -212,7 +220,10 @@ wss.on("connection", (socket) => {
     room?.participants.delete(membership.peerId);
     roomSockets.get(membership.roomId)?.delete(wsClientId);
     socketIndex.delete(wsClientId);
-    if (room) emitRoomState(room);
+    if (room) {
+      reassignHostIfNeeded(room);
+      emitRoomState(room);
+    }
   });
 });
 
