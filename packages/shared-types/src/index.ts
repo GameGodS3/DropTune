@@ -17,11 +17,19 @@ export interface TrackMetadata {
   normalizedName: string;
 }
 
+export interface TrackSnapshot {
+  title: string;
+  artist?: string;
+  album?: string;
+  durationSec: number;
+}
+
 export interface QueueItem {
   id: QueueItemId;
   trackId: TrackId;
   requestedBy: PeerId;
   addedAt: number;
+  trackSnapshot?: TrackSnapshot;
 }
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";

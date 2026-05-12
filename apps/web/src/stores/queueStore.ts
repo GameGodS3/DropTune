@@ -1,11 +1,11 @@
 import { create } from "zustand";
-import type { QueueItem } from "@droptune/shared-types";
+import type { QueueItem, TrackSnapshot } from "@droptune/shared-types";
 import { makeId } from "../lib/id";
 
 interface QueueState {
   queue: QueueItem[];
   setQueue: (queue: QueueItem[]) => void;
-  addToQueue: (trackId: string, requestedBy: string) => QueueItem;
+  addToQueue: (trackId: string, requestedBy: string, snapshot?: TrackSnapshot) => QueueItem;
   removeFromQueue: (queueItemId: string) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
 }
@@ -13,12 +13,13 @@ interface QueueState {
 export const useQueueStore = create<QueueState>((set) => ({
   queue: [],
   setQueue: (queue) => set({ queue }),
-  addToQueue: (trackId, requestedBy) => {
+  addToQueue: (trackId, requestedBy, snapshot?) => {
     const item: QueueItem = {
       id: makeId(),
       trackId,
       requestedBy,
-      addedAt: Date.now()
+      addedAt: Date.now(),
+      trackSnapshot: snapshot
     };
     set((state) => ({ queue: [...state.queue, item] }));
     return item;

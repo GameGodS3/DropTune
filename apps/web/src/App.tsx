@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ControlPlaneEvent } from "@droptune/protocol";
-import type { QueueItem, TrackMetadata } from "@droptune/shared-types";
+import type { QueueItem, TrackMetadata, TrackSnapshot } from "@droptune/shared-types";
 import { buildTrackId, filterSupportedFiles, indexFiles } from "./lib/metadata";
 import { makeId } from "./lib/id";
+import { transferManager } from "./lib/transfer";
+import type { SendSignalFn } from "./lib/transfer";
 import { selectFilteredTracks, useLibraryStore } from "./stores/libraryStore";
 import { usePeerStore } from "./stores/peerStore";
 import { usePlaybackStore } from "./stores/playbackStore";
 import { useQueueStore } from "./stores/queueStore";
 import { useRoomStore } from "./stores/roomStore";
+import { useTransferStore } from "./stores/transferStore";
 
 type ExtendedWindow = Window & {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -59,6 +62,17 @@ export function App() {
   const [activeQueueItemId, setActiveQueueItemId] = useState<string | undefined>();
   const lastPlaybackEmitRef = useRef(0);
 
+  // Live-ref for ws.onmessage — reassigned every render so handlers always
+  // close over fresh localFiles, isHost, etc.
+  const wsMessageHandlerRef = useRef<(msg: MessageEvent) => void>(() => undefined);
+
+  // Pending file requests keyed by trackId: waiting for FILE_AVAILABLE
+  const pendingFileRequests = useRef(new Map<string, {
+    resolve: (blob: Blob) => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>());
+
   const { tracks, localFiles, query, isIndexing, setQuery, setIndexing, upsertTracks, hydrate } =
     useLibraryStore();
   const filtered = useMemo(() => selectFilteredTracks(useLibraryStore.getState()), [tracks, query]);
@@ -68,6 +82,7 @@ export function App() {
   const isHost = !roomStore.roomId || !roomStore.isConnected || peerId === roomStore.hostPeerId;
   const { queue, setQueue, addToQueue, removeFromQueue, moveQueueItem } = useQueueStore();
   const playback = usePlaybackStore();
+  const { status: transferStatus, progressPct, setTransfer } = useTransferStore();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -147,6 +162,15 @@ export function App() {
     }
   }
 
+  function sendSignalTo(targetPeerId: string, signal: unknown) {
+    if (!roomStore.roomId || !roomStore.isConnected) return;
+    sendEvent({
+      type: "WEBRTC_SIGNAL",
+      sentAt: Date.now(),
+      payload: { roomId: roomStore.roomId, sourcePeerId: peerId, targetPeerId, signal }
+    });
+  }
+
   function onRoomState(event: Extract<ControlPlaneEvent, { type: "ROOM_STATE" }>) {
     const { room } = event.payload;
     setQueue(room.queue);
@@ -199,18 +223,18 @@ export function App() {
       ws.send(JSON.stringify(joinEvent));
     };
 
-    ws.onmessage = (message) => {
-      let event: ControlPlaneEvent;
-      try {
-        event = JSON.parse(String(message.data)) as ControlPlaneEvent;
-      } catch {
-        return;
-      }
-      if (event.type === "ROOM_STATE") onRoomState(event);
-    };
+    // Delegate to the live ref so handlers always see the latest closures.
+    ws.onmessage = (msg) => wsMessageHandlerRef.current(msg);
 
     ws.onclose = () => {
       roomStore.setConnected(false);
+      transferManager.cleanup();
+      for (const pending of pendingFileRequests.current.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error("Disconnected from room"));
+      }
+      pendingFileRequests.current.clear();
+      setTransfer("idle", 0);
     };
   }
 
@@ -287,9 +311,48 @@ export function App() {
     return undefined;
   }
 
+  function requestFileFromPeer(trackId: string): Promise<Blob> {
+    return new Promise<Blob>((resolve, reject) => {
+      if (!roomStore.roomId || !roomStore.isConnected) {
+        reject(new Error("Not connected to a room"));
+        return;
+      }
+      // Deduplicate: if a request for this track is already in flight, piggyback on it.
+      if (pendingFileRequests.current.has(trackId)) {
+        reject(new Error("Transfer already in progress for this track"));
+        return;
+      }
+      const timer = setTimeout(() => {
+        pendingFileRequests.current.delete(trackId);
+        setTransfer("idle", 0);
+        reject(new Error("File request timed out — no peer in the room has this track"));
+      }, 15000);
+      pendingFileRequests.current.set(trackId, { resolve, reject, timer });
+      sendEvent({
+        type: "FILE_REQUEST",
+        sentAt: Date.now(),
+        payload: { roomId: roomStore.roomId, trackId, sourcePeerId: peerId, targetPeerId: "broadcast" }
+      });
+      setTransfer("requesting", 0);
+    });
+  }
+
   async function playTrack(track: TrackMetadata) {
     setPlaybackError(null);
-    const file = localFiles[track.id];
+    let file = localFiles[track.id];
+
+    if (!file && roomStore.isConnected && roomStore.roomId) {
+      try {
+        const blob = await requestFileFromPeer(track.id);
+        file = new File([blob], track.fileName || track.title, { type: blob.type });
+      } catch (err) {
+        setPlaybackError(err instanceof Error ? err.message : "Transfer failed");
+        setTransfer("idle", 0);
+        playback.setStatus("error");
+        return;
+      }
+    }
+
     if (!file || !audioRef.current) {
       setPlaybackError("Track file is unavailable on this device. Re-index this folder on the current device.");
       return;
@@ -319,7 +382,26 @@ export function App() {
       });
     }
     if (!isHost) return;
-    const track = resolvePlayableTrack(item);
+
+    let track = resolvePlayableTrack(item);
+
+    // If not in local library, build a stub from the snapshot so playTrack
+    // can attempt to fetch the file via WebRTC transfer.
+    if (!track && item.trackSnapshot) {
+      track = {
+        id: item.trackId,
+        sourceDeviceId: "",
+        fileName: item.trackSnapshot.title,
+        title: item.trackSnapshot.title,
+        artist: item.trackSnapshot.artist,
+        album: item.trackSnapshot.album,
+        durationSec: item.trackSnapshot.durationSec,
+        format: "unknown",
+        sizeBytes: 0,
+        normalizedName: item.trackSnapshot.title.toLowerCase()
+      };
+    }
+
     if (!track) {
       setPlaybackError("No locally playable copy found for this queued track on current device.");
       return;
@@ -328,17 +410,32 @@ export function App() {
   }
 
   function emitQueueAdd(trackId: string) {
+    const trackMeta = tracks.find((t) => t.id === trackId);
+    const snapshot: TrackSnapshot | undefined = trackMeta
+      ? {
+          title: trackMeta.title,
+          artist: trackMeta.artist,
+          album: trackMeta.album,
+          durationSec: trackMeta.durationSec
+        }
+      : undefined;
+
     if (!roomStore.roomId || !roomStore.isConnected) {
-      addToQueue(trackId, peerId);
+      addToQueue(trackId, peerId, snapshot);
       return;
     }
-    const item: QueueItem = { id: makeId(), trackId, requestedBy: peerId, addedAt: Date.now() };
-    const event: ControlPlaneEvent = {
+    const item: QueueItem = {
+      id: makeId(),
+      trackId,
+      requestedBy: peerId,
+      addedAt: Date.now(),
+      trackSnapshot: snapshot
+    };
+    sendEvent({
       type: "QUEUE_ADD",
       sentAt: Date.now(),
       payload: { roomId: roomStore.roomId, item }
-    };
-    sendEvent(event);
+    });
   }
 
   function emitQueueRemove(queueItemId: string) {
@@ -394,6 +491,63 @@ export function App() {
     });
   }
 
+  // Reassign every render so the handler always closes over fresh state.
+  wsMessageHandlerRef.current = (message: MessageEvent) => {
+    let event: ControlPlaneEvent;
+    try {
+      event = JSON.parse(String(message.data)) as ControlPlaneEvent;
+    } catch {
+      return;
+    }
+
+    if (event.type === "ROOM_STATE") {
+      onRoomState(event);
+      return;
+    }
+
+    if (event.type === "FILE_REQUEST" && event.payload.sourcePeerId !== peerId) {
+      // Another peer wants a file — if we have it locally, offer to send it.
+      const { trackId, sourcePeerId: requestingPeerId } = event.payload;
+      const file = localFiles[trackId];
+      if (file && roomStore.roomId && roomStore.isConnected) {
+        const signalFn: SendSignalFn = (targetPeerId, signal) => sendSignalTo(targetPeerId, signal);
+        transferManager.prepareToSend(requestingPeerId, file, signalFn);
+        sendEvent({
+          type: "FILE_AVAILABLE",
+          sentAt: Date.now(),
+          payload: { roomId: roomStore.roomId, sourcePeerId: peerId, trackId }
+        });
+      }
+      return;
+    }
+
+    if (event.type === "FILE_AVAILABLE") {
+      const { trackId, sourcePeerId } = event.payload;
+      const pending = pendingFileRequests.current.get(trackId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingFileRequests.current.delete(trackId);
+        setTransfer("downloading", 0);
+        const signalFn: SendSignalFn = (targetPeerId, signal) => sendSignalTo(targetPeerId, signal);
+        transferManager
+          .requestFile(sourcePeerId, signalFn, (pct) => setTransfer("downloading", pct))
+          .then((blob) => {
+            setTransfer("idle", 100);
+            pending.resolve(blob);
+          })
+          .catch((err: unknown) => {
+            setTransfer("idle", 0);
+            pending.reject(err instanceof Error ? err : new Error(String(err)));
+          });
+      }
+      return;
+    }
+
+    if (event.type === "WEBRTC_SIGNAL" && event.payload.targetPeerId === peerId) {
+      transferManager.handleSignal(event.payload.sourcePeerId, event.payload.signal);
+    }
+  };
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl p-6">
       <audio ref={audioRef} preload="metadata" />
@@ -411,7 +565,7 @@ export function App() {
       />
 
       <header className="mb-6">
-        <h1 className="mb-4 text-2xl font-semibold">DropTune - Phase 4</h1>
+        <h1 className="mb-4 text-2xl font-semibold">DropTune - Phase 5</h1>
         <div className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4 md:grid-cols-3">
           <div className="md:col-span-2">
             <p className="mb-2 text-sm text-slate-300">Nearby Rooms</p>
@@ -484,6 +638,14 @@ export function App() {
       {roomError ? <p className="mb-4 text-sm text-amber-400">{roomError}</p> : null}
       {playbackError ? <p className="mb-4 text-sm text-red-400">{playbackError}</p> : null}
 
+      {transferStatus !== "idle" && (
+        <div className="mb-4 rounded border border-blue-700 bg-blue-950 px-4 py-2 text-sm text-blue-200">
+          {transferStatus === "requesting"
+            ? "Requesting file from room peers..."
+            : `Downloading from peer... ${progressPct}%`}
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded border border-slate-800 bg-slate-900 p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -535,11 +697,29 @@ export function App() {
           <div className="mb-4 space-y-2">
             {queue.map((item, index) => {
               const track = tracks.find((t) => t.id === item.trackId);
-              if (!track) return null;
+              const title = track?.title ?? item.trackSnapshot?.title ?? item.trackId;
+              const artist = track?.artist ?? item.trackSnapshot?.artist;
+              const isRemote = !track;
+              const isActive = item.id === activeQueueItemId;
               return (
-                <article key={item.id} className="rounded border border-slate-800 bg-slate-950 p-3 text-sm">
-                  <p className="font-medium">{track.title}</p>
-                  <p className="text-slate-300">{track.artist ?? "Unknown artist"}</p>
+                <article
+                  key={item.id}
+                  className={`rounded border p-3 text-sm ${isActive ? "border-indigo-600 bg-indigo-950" : "border-slate-800 bg-slate-950"}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{title}</p>
+                    {isRemote && (
+                      <span className="rounded bg-slate-700 px-1 py-0.5 text-xs text-slate-400">
+                        remote
+                      </span>
+                    )}
+                    {isActive && (
+                      <span className="rounded bg-indigo-600 px-1 py-0.5 text-xs text-white">
+                        playing
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-300">{artist ?? "Unknown artist"}</p>
                   <div className="mt-2 flex gap-2">
                     <button
                       type="button"
