@@ -299,14 +299,30 @@ export function App() {
   }
 
   function resolvePlayableTrack(item: QueueItem): TrackMetadata | undefined {
+    // 1. Exact stored ID match.
     const exact = tracks.find((t) => t.id === item.trackId);
     if (exact) return exact;
 
-    const target = tracks.find((candidate) => {
-      const candidateId = buildTrackId(candidate);
-      return candidateId === item.trackId;
-    });
-    if (target) return target;
+    // 2. Recompute ID from current metadata (handles re-indexed tracks).
+    const byId = tracks.find((t) => buildTrackId(t) === item.trackId);
+    if (byId) return byId;
+
+    // 3. Fuzzy match: same normalized title + artist + duration within 2s.
+    //    Catches the same file indexed under a different path/filename.
+    const snap = item.trackSnapshot;
+    if (snap) {
+      const normTitle = snap.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const normArtist = (snap.artist ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const fuzzy = tracks.find((t) => {
+        const tTitle = t.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const tArtist = (t.artist ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const titleMatch = tTitle === normTitle;
+        const artistMatch = !normArtist || !tArtist || tArtist === normArtist;
+        const durationMatch = Math.abs(t.durationSec - snap.durationSec) <= 2;
+        return titleMatch && artistMatch && durationMatch;
+      });
+      if (fuzzy) return fuzzy;
+    }
 
     return undefined;
   }
