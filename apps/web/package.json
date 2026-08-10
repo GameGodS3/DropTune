@@ -14,11 +14,13 @@
     "@droptune/shared-types": "workspace:*",
     "idb": "^8.0.2",
     "music-metadata-browser": "^2.5.11",
+    "qrcode-generator": "^2.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/qrcode-generator": "^1.0.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.4.1",

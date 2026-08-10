@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { networkInterfaces } from "node:os";
 import { Bonjour } from "bonjour-service";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ControlPlaneEvent } from "@droptune/protocol";
@@ -32,8 +33,23 @@ app.use(
 );
 app.use(express.json());
 
+function getLanIp(): string | null {
+  const nets = networkInterfaces();
+  for (const ifaces of Object.values(nets)) {
+    if (!ifaces) continue;
+    for (const iface of ifaces) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+}
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "droptune-coordinator", time: Date.now() });
+});
+
+app.get("/info", (_req, res) => {
+  res.json({ lanIp: getLanIp(), coordinatorPort: PORT });
 });
 
 app.get("/rooms", (_req, res) => {
